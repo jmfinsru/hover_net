@@ -37,6 +37,7 @@ from misc.utils import (
 )
 from misc.viz_utils import colorize, visualize_instances_dict
 from skimage import color
+from pathlib import Path
 
 import convert_format
 from . import base
@@ -154,10 +155,15 @@ class InferManager(base.InferManager):
         for variable, value in run_args.items():
             self.__setattr__(variable, value)
         assert self.mem_usage < 1.0 and self.mem_usage > 0.0
-
+        
         # * depend on the number of samples and their size, this may be less efficient
         patterning = lambda x: re.sub("([\[\]])", "[\\1]", x)
-        file_path_list = glob.glob(patterning("%s/*" % self.input_dir))
+        print(self.input_dir)
+        print(os.path.exists(self.input_dir))
+        print(patterning(f"{self.input_dir}/*"))
+        # file_path_list = glob.glob(patterning("%s/*" % self.input_dir))
+        file_path_list = glob.glob(patterning(f"{self.input_dir}/*")) # A
+        # file_path_list = [self.input_dir]
         file_path_list.sort()  # ensure same order
         assert len(file_path_list) > 0, 'Not Detected Any Files From Path'
         
@@ -251,9 +257,15 @@ class InferManager(base.InferManager):
             cache_image_list = []
             cache_patch_info_list = []
             cache_image_info_list = []
+            print(file_path_list)
             while len(file_path_list) > 0:
                 file_path = file_path_list.pop(0)
+                path_file = Path(file_path)       #A
+                if path_file.suffix != ".jpg":    #A
+                    print(path_file.suffix)       #A
+                    continue                      #A
 
+                print(f"Working on {file_path}...")
                 img = cv2.imread(file_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 src_shape = img.shape
@@ -271,7 +283,9 @@ class InferManager(base.InferManager):
                 expected_usage = sys.getsizeof(img) * 5
                 available_ram -= expected_usage
                 if available_ram < 0:
-                    break
+                    print("Hallo", file_path)
+                    print(expected_usage, getattr(hardware_stats, "available"))
+                    # break
 
                 file_idx += 1
                 # if file_idx == 4: break
@@ -303,9 +317,12 @@ class InferManager(base.InferManager):
             )
 
             accumulated_patch_output = []
+            print("HALLOOOO", cache_image_list)
             for batch_idx, batch_data in enumerate(dataloader):
                 sample_data_list, sample_info_list = batch_data
+                # print(sample_data_list.device)
                 sample_output_list = self.run_step(sample_data_list)
+                print("Ran step")
                 sample_info_list = sample_info_list.numpy()
                 curr_batch_size = sample_output_list.shape[0]
                 sample_output_list = np.split(
