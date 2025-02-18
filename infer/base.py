@@ -66,9 +66,11 @@ class InferManager(object):
         saved_state_dict = convert_pytorch_checkpoint(saved_state_dict)
 
         net.load_state_dict(saved_state_dict, strict=True)
-        net = torch.nn.DataParallel(net)
-        net = net.to("cuda")
-
+        net = net.to("cpu") # A
+        # net = torch.nn.DataParallel(net)
+        # net = net.to("cuda")
+        # net = net.to("cpu") # A
+        # print(net.device) # A
         module_lib = import_module("models.hovernet.run_desc")
         run_step = getattr(module_lib, "infer_step")
         self.run_step = lambda input_batch: run_step(input_batch, net)
@@ -76,7 +78,7 @@ class InferManager(object):
         module_lib = import_module("models.hovernet.post_proc")
         self.post_proc_func = getattr(module_lib, "process")
         return
-
+      
     def __save_json(self, path, old_dict, mag=None):
         new_dict = {}
         for inst_id, inst_info in old_dict.items():
@@ -89,6 +91,7 @@ class InferManager(object):
             new_dict[int(inst_id)] = new_inst_info
 
         json_dict = {"mag": mag, "nuc": new_dict}  # to sync the format protocol
+        print("EnteredY")
         with open(path, "w") as handle:
             json.dump(json_dict, handle)
         return new_dict
