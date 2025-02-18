@@ -173,11 +173,15 @@ def infer_step(batch_data, model):
     ####
     patch_imgs = batch_data
 
-    patch_imgs_gpu = patch_imgs.to("cuda").type(torch.float32)  # to NCHW
+    patch_imgs_gpu = patch_imgs.to("cpu").type(torch.float32)  # ?to NCHW? A
+
+    # patch_imgs_gpu = patch_imgs.to("cuda").type(torch.float32)  # to NCHW
     patch_imgs_gpu = patch_imgs_gpu.permute(0, 3, 1, 2).contiguous()
 
     ####
     model.eval()  # infer mode
+    #print(model) #A
+    
 
     # --------------------------------------------------------------
     with torch.no_grad():  # dont compute gradient
