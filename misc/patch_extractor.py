@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .utils import cropping_center
+from utils import cropping_center #J- changed .utils to utils to make it run
 
 
 #####
@@ -75,14 +75,14 @@ class PatchExtractor(object):
         im_w = x.shape[1]
 
         def extract_infos(length, win_size, step_size):
-            flag = (length - win_size) % step_size != 0
+            flag = (length - win_size) % step_size != 0 #J- check if (length - win_size) is evenly divided by step size. Example: If answer is 9 it is False but if it is 6.3 it is True  
             last_step = math.floor((length - win_size) / step_size)
             last_step = (last_step + 1) * step_size
             return flag, last_step
-
+        
         h_flag, h_last = extract_infos(im_h, self.win_size[0], self.step_size[0])
         w_flag, w_last = extract_infos(im_w, self.win_size[1], self.step_size[1])
-
+    
         sub_patches = []
         #### Deal with valid block
         for row in range(0, h_last, self.step_size[0]):
