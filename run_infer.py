@@ -179,8 +179,10 @@ if __name__ == '__main__':
     if sub_cmd == 'tile':
         from infer.tile import InferManager
         infer = InferManager(**method_args)
+        print(f"run_args: {run_args}")
         infer.process_file_list(run_args)
     else:
         from infer.wsi import InferManager
         infer = InferManager(**method_args)
         infer.process_wsi_list(run_args)
+        
