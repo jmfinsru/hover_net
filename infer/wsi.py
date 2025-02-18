@@ -445,7 +445,7 @@ class InferManager(base.InferManager):
         self.patch_input_shape = [self.patch_input_shape, self.patch_input_shape]
         self.patch_output_shape = [self.patch_output_shape, self.patch_output_shape]
         return
-
+    
     def process_single_file(self, wsi_path, msk_path, output_dir):
         """Process a single whole-slide image and save the results.
 
@@ -461,11 +461,10 @@ class InferManager(base.InferManager):
         chunk_input_shape = np.array(self.chunk_shape)
         patch_input_shape = np.array(self.patch_input_shape)
         patch_output_shape = np.array(self.patch_output_shape)
-
         path_obj = pathlib.Path(wsi_path)
         wsi_ext = path_obj.suffix
         wsi_name = path_obj.stem
-
+        print(f"wsi_name: {wsi_name}")
         start = time.perf_counter()
         self.wsi_handler = get_file_handler(wsi_path, backend=wsi_ext)
         self.wsi_proc_shape = self.wsi_handler.get_dimensions(self.proc_mag)
@@ -482,7 +481,6 @@ class InferManager(base.InferManager):
             log_info(
                 "WARNING: No mask found, generating mask via thresholding at 1.25x!"
             )
-
             from skimage import morphology
 
             # simple method to extract tissue regions using intensity thresholding and morphological operations
@@ -707,7 +705,7 @@ class InferManager(base.InferManager):
         self.__save_json(json_path, self.wsi_inst_info, mag=self.proc_mag)
         end = time.perf_counter()
         log_info("Save Time: {0}".format(end - start))
-
+    
     def process_wsi_list(self, run_args):
         """Process a list of whole-slide images.
 
@@ -728,10 +726,14 @@ class InferManager(base.InferManager):
         if self.save_mask:
             if not os.path.exists(self.output_dir + "/mask/"):
                 rm_n_mkdir(self.output_dir + "/mask/")
-
+        
         wsi_path_list = glob.glob(self.input_dir + "/*")
         wsi_path_list.sort()  # ensure ordering
+        print(f"wsi_path_list: {wsi_path_list}")
+        
         for wsi_path in wsi_path_list[:]:
+            # if pathlib.Path(wsi_path).suffix != ".tif": # A
+            #     continue                                # A
             if os.path.isdir(wsi_path):
                 continue
             wsi_base_name = pathlib.Path(wsi_path).stem
