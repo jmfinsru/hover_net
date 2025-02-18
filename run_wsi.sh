@@ -4,12 +4,13 @@ python run_infer.py \
 --type_info_path=type_info.json \
 --batch_size=64 \
 --model_mode=fast \
---model_path=../pretrained/hovernet_fast_pannuke_type_tf2pytorch.tar \
---nr_inference_workers=8 \
---nr_post_proc_workers=16 \
+--model_path=/media/jenny/PRIVATE_USB/Hover_net_files/Pannuke_checkpoints/hovernet_fast_pannuke_type_tf2pytorch.tar \
+--nr_inference_workers=2 \
+--nr_post_proc_workers=3 \
 wsi \
---input_dir=dataset/sample_wsis/wsi/ \
---output_dir=dataset/sample_wsis/out/ \
---input_mask_dir=dataset/sample_wsis/msk/ \
+--input_dir=/media/jenny/PRIVATE_USB/Converted_images \
+--output_dir=/media/jenny/PRIVATE_USB/Hover_net_files/Output/WSI \
 --save_thumb \
---save_mask
+--save_mask \
+
+# --input_mask_dir=dataset/sample_wsis/msk/ \
