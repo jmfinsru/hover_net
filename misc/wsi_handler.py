@@ -73,10 +73,10 @@ class FileHandler(object):
             self.read_lv = read_lv
         else:
             print("Entered")
-            # np.save(cache_path, self.get_full_img(read_mag=read_mag))
+            np.save(cache_path, self.get_full_img(read_mag=read_mag))
             print("Done saving")
             #Added to make it work
-            cache_path = '/media/jenny/PRIVATE_USB/Google_colab/cache_test.npy'
+            # cache_path = '/media/jenny/PRIVATE_USB/Google_colab/cache_test.npy'
             self.image_ptr = np.load(cache_path, mmap_mode="r")
         return
 
