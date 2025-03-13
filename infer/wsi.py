@@ -305,6 +305,7 @@ class InferManager(base.InferManager):
             has_output_info: whether output information is given
         
         """
+        
         down_sample_ratio = self.wsi_mask.shape[0] / self.wsi_proc_shape[0]
         selected_indices = []
         for idx in range(patch_info_list.shape[0]):
@@ -473,7 +474,7 @@ class InferManager(base.InferManager):
             read_mag=self.proc_mag, cache_path="%s/src_wsi.npy" % self.cache_path
         )
         self.wsi_proc_shape = np.array(self.wsi_proc_shape[::-1])  # to Y, X
-
+        print(f"msk_path before warning: {msk_path}")
         if msk_path is not None and os.path.isfile(msk_path):
             self.wsi_mask = cv2.imread(msk_path)
             self.wsi_mask = cv2.cvtColor(self.wsi_mask, cv2.COLOR_BGR2GRAY)
