@@ -225,9 +225,11 @@ def _get_chunk_patch_info(
 def _post_proc_para_wrapper(pred_map_mmap_path, tile_info, func, func_kwargs):
     """Wrapper for parallel post processing."""
     idx, tile_tl, tile_br = tile_info
+    print(f"{tile_info=}", flush=True)
     wsi_pred_map_ptr = np.load(pred_map_mmap_path, mmap_mode="r")
     tile_pred_map = wsi_pred_map_ptr[tile_tl[0] : tile_br[0], tile_tl[1] : tile_br[1]]
     tile_pred_map = np.array(tile_pred_map)  # from mmap to ram
+    print(f"tile_pred_map_size: {tile_pred_map.size}", flush=True)
     return func(tile_pred_map, **func_kwargs), tile_info
 
 
@@ -385,13 +387,17 @@ class InferManager(base.InferManager):
 
     def __dispatch_post_processing(self, tile_info_list, callback):
         """Post processing initialisation."""
+        print("Entered dispatch_post_processing")
         proc_pool = None
         if self.nr_post_proc_workers > 0:
+            print(f"self.nr_post_ptoc_workers: {self.nr_post_proc_workers}")
             proc_pool = ProcessPoolExecutor(self.nr_post_proc_workers)
 
         future_list = []
+        print(f"future_list:{future_list}")
         wsi_pred_map_mmap_path = "%s/pred_map.npy" % self.cache_path
-        for idx in list(range(tile_info_list.shape[0])):
+        for idx in tqdm.tqdm(list(range(tile_info_list.shape[0]))):
+            # print(f"idx:{idx}")
             tile_tl = tile_info_list[idx][0]
             tile_br = tile_info_list[idx][1]
 
@@ -403,6 +409,7 @@ class InferManager(base.InferManager):
 
             # TODO: standarize protocol
             if proc_pool is not None:
+                print(f"proc_pool not none, is:{proc_pool}")
                 proc_future = proc_pool.submit(
                     _post_proc_para_wrapper,
                     wsi_pred_map_mmap_path,
@@ -414,11 +421,14 @@ class InferManager(base.InferManager):
                 # ! that the callback is called from main thread
                 future_list.append(proc_future)
             else:
+                print("proc_pool is None")
                 results = _post_proc_para_wrapper(
                     wsi_pred_map_mmap_path, tile_info, self.post_proc_func, func_kwargs
                 )
                 callback(results)
+            print(f"future_list update in for loop:{future_list}")
         if proc_pool is not None:
+            print("Entered if proc_pool is not None")
             silent_crash = False
             # loop over all to check state a.k.a polling
             for future in as_completed(future_list):
@@ -434,6 +444,7 @@ class InferManager(base.InferManager):
                 else:
                     callback(future.result())
             assert not silent_crash
+        print("Before return")
         return
 
     def _parse_args(self, run_args):
@@ -563,19 +574,23 @@ class InferManager(base.InferManager):
         # tile_cross_info: region at corners of post processing tiles
         tile_grid_info, tile_boundary_info, tile_cross_info = tile_coord_set
         tile_grid_info = self.__select_valid_patches(tile_grid_info, False)
+        print(f"tile_grid_info_shape: {tile_grid_info.shape[0]}")
+        print(f"tile_grid_info_list: {list(range(tile_grid_info.shape[0]))}")
         tile_boundary_info = self.__select_valid_patches(tile_boundary_info, False)
         tile_cross_info = self.__select_valid_patches(tile_cross_info, False)
+        # print(f"tile_coord_set: {tile_coord_set}")
 
         ####################### * Callback can only receive 1 arg
         def post_proc_normal_tile_callback(args):
+            print("Entered post_proc_normal_tile_callback")
             results, pos_args = args
             run_idx, tile_tl, tile_br = pos_args
             pred_inst, inst_info_dict = results
-
+            print("post_proc_normal_tile_callback 1")
             if len(inst_info_dict) == 0:
                 pbar.update()  # external
                 return  # when there is nothing to do
-
+            print("post_proc_normal_tile_callback 2")
             top_left = pos_args[1][::-1]
 
             # ! WARNING:
@@ -583,33 +598,41 @@ class InferManager(base.InferManager):
             # ! hence must use max as safeguard
 
             wsi_max_id = 0
+            print("post_proc_normal_tile_callback 3")
             if len(self.wsi_inst_info) > 0:
                 wsi_max_id = max(self.wsi_inst_info.keys())
+                print("post_proc_normal_tile_callback 4")
             for inst_id, inst_info in inst_info_dict.items():
                 # now correct the coordinate wrt to wsi
                 inst_info["bbox"] += top_left
                 inst_info["contour"] += top_left
                 inst_info["centroid"] += top_left
                 self.wsi_inst_info[inst_id + wsi_max_id] = inst_info
+                print("post_proc_normal_tile_callback 5")
             pred_inst[pred_inst > 0] += wsi_max_id
+            print("post_proc_normal_tile_callback 6")
             self.wsi_inst_map[
                 tile_tl[0] : tile_br[0], tile_tl[1] : tile_br[1]
             ] = pred_inst
+            print("post_proc_normal_tile_callback 7")
 
             pbar.update()  # external
+            print("post_proc_normal_tile_callback 8")
             return
 
         ####################### * Callback can only receive 1 arg
         def post_proc_fixing_tile_callback(args):
+            print("Entered post_proc_fixing_tile_callback")
             results, pos_args = args
             run_idx, tile_tl, tile_br = pos_args
             pred_inst, inst_info_dict = results
-
+            print("post_proc_fixing_tile_callback 1")
             if len(inst_info_dict) == 0:
                 pbar.update()  # external
                 return  # when there is nothing to do
 
             top_left = pos_args[1][::-1]
+            print("post_proc_fixing_tile_callback 2")
 
             # for fixing the boundary, keep all nuclei split at boundary (i.e within unambigous region)
             # of the existing prediction map, and replace all nuclei within the region with newly predicted
@@ -621,39 +644,54 @@ class InferManager(base.InferManager):
             # ! must get before the removal happened
             wsi_max_id = 0
             if len(self.wsi_inst_info) > 0:
+                print("post_proc_fixing_tile_callback 3")
                 wsi_max_id = max(self.wsi_inst_info.keys())
 
             # * exclude ambiguous out from old prediction map
             # check 1 pix of 4 edges to find nuclei split at boundary
+            print("post_proc_fixing_tile_callback 4")
             roi_inst = self.wsi_inst_map[
                 tile_tl[0] : tile_br[0], tile_tl[1] : tile_br[1]
             ]
+            print("post_proc_fixing_tile_callback 5")
             roi_inst = np.copy(roi_inst)
+            print("post_proc_fixing_tile_callback 6")
             roi_edge = np.concatenate(
                 [roi_inst[[0, -1], :].flatten(), roi_inst[:, [0, -1]].flatten()]
             )
+            print("post_proc_fixing_tile_callback 7")
             roi_boundary_inst_list = np.unique(roi_edge)[1:]  # exclude background
+            print("post_proc_fixing_tile_callback 8")
             roi_inner_inst_list = np.unique(roi_inst)[1:]
+            print("post_proc_fixing_tile_callback 9")
             roi_inner_inst_list = np.setdiff1d(
                 roi_inner_inst_list, roi_boundary_inst_list, assume_unique=True
             )
+            print("post_proc_fixing_tile_callback 10")
             roi_inst = _remove_inst(roi_inst, roi_inner_inst_list)
+            print("post_proc_fixing_tile_callback 11")
             self.wsi_inst_map[
                 tile_tl[0] : tile_br[0], tile_tl[1] : tile_br[1]
             ] = roi_inst
+            print("post_proc_fixing_tile_callback 12")
             for inst_id in roi_inner_inst_list:
                 self.wsi_inst_info.pop(inst_id, None)
-
+            print("post_proc_fixing_tile_callback 13")
             # * exclude unambiguous out from new prediction map
             # check 1 pix of 4 edges to find nuclei split at boundary
+            print("post_proc_fixing_tile_callback 14")
             roi_edge = pred_inst[roi_inst > 0]  # remove all overlap
+            print("post_proc_fixing_tile_callback 15")
             boundary_inst_list = np.unique(roi_edge)  # no background to exclude
+            print("post_proc_fixing_tile_callback 16")
             inner_inst_list = np.unique(pred_inst)[1:]
+            print("post_proc_fixing_tile_callback 17")
             inner_inst_list = np.setdiff1d(
                 inner_inst_list, boundary_inst_list, assume_unique=True
             )
+            print("post_proc_fixing_tile_callback 18")
             pred_inst = _remove_inst(pred_inst, boundary_inst_list)
-
+            print("post_proc_fixing_tile_callback 19")
             # * proceed to overwrite
             for inst_id in inner_inst_list:
                 # ! happen because we alrd skip thoses with wrong
@@ -673,32 +711,38 @@ class InferManager(base.InferManager):
             self.wsi_inst_map[
                 tile_tl[0] : tile_br[0], tile_tl[1] : tile_br[1]
             ] = pred_inst
-
+            print("post_proc_fixing_tile_callback 20")
             pbar.update()  # external
+            print("post_proc_fixing_tile_callback 21")
             return
 
         #######################
+        print("before pbar_creator")
         pbar_creator = lambda x, y: tqdm.tqdm(
             desc=y, leave=True, total=int(len(x)), ncols=80, ascii=True, position=0
         )
+        print("pbar Post Proc Phase 1")
+        print(f"pbar_creator: {pbar_creator}")
         pbar = pbar_creator(tile_grid_info, "Post Proc Phase 1")
+        print(f"pbar:{pbar}")
         # * must be in sequential ordering
         self.__dispatch_post_processing(tile_grid_info, post_proc_normal_tile_callback)
         pbar.close()
-
+        print("pbar Post Proc Phase 2")
         pbar = pbar_creator(tile_boundary_info, "Post Proc Phase 2")
         self.__dispatch_post_processing(
             tile_boundary_info, post_proc_fixing_tile_callback
         )
         pbar.close()
-
+        print("pbar Post Proc Phase 3")
         pbar = pbar_creator(tile_cross_info, "Post Proc Phase 3")
         self.__dispatch_post_processing(tile_cross_info, post_proc_fixing_tile_callback)
         pbar.close()
 
         end = time.perf_counter()
         log_info("Total Post Proc Time: {0}".format(end - start))
-
+        
+        print("before end of postprocessing")
         # ! cant possibly save the inst map at high res, too large
         start = time.perf_counter()
         if self.save_mask or self.save_thumb:
@@ -710,6 +754,7 @@ class InferManager(base.InferManager):
         log_info("Save Time: {0}".format(end - start))
 
     def process_wsi_list(self, run_args):
+        print("Entered process_wsi_list")
         """Process a list of whole-slide images.
 
         Args:
@@ -736,7 +781,7 @@ class InferManager(base.InferManager):
             if os.path.isdir(wsi_path):
                 continue
             wsi_base_name = pathlib.Path(wsi_path).stem
-            msk_path = "%s/%s.png" % (self.input_mask_dir, wsi_base_name)
+            msk_path = "%s/%s.tif" % (self.input_mask_dir, wsi_base_name)
             if self.save_thumb or self.save_mask:
                 output_file = "%s/json/%s.json" % (self.output_dir, wsi_base_name)
             else:
